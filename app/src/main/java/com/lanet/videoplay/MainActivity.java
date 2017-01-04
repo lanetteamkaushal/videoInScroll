@@ -2,130 +2,100 @@ package com.lanet.videoplay;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
-import android.view.View;
-import android.widget.ImageView;
 
-import com.volokh.danylo.video_player_manager.MessagesHandlerThread;
-import com.volokh.danylo.video_player_manager.PlayerMessageState;
+import com.squareup.picasso.Picasso;
 import com.volokh.danylo.video_player_manager.manager.PlayerItemChangeListener;
 import com.volokh.danylo.video_player_manager.manager.SingleVideoPlayerManager;
 import com.volokh.danylo.video_player_manager.manager.VideoPlayerManager;
-import com.volokh.danylo.video_player_manager.manager.VideoPlayerManagerCallback;
-import com.volokh.danylo.video_player_manager.meta.CurrentItemMetaData;
 import com.volokh.danylo.video_player_manager.meta.MetaData;
-import com.volokh.danylo.video_player_manager.ui.MediaPlayerWrapper;
-import com.volokh.danylo.video_player_manager.ui.SimpleMainThreadMediaPlayerListener;
-import com.volokh.danylo.video_player_manager.ui.VideoPlayerView;
+import com.volokh.danylo.visibility_utils.calculator.DefaultSingleItemCalculatorCallback;
+import com.volokh.danylo.visibility_utils.calculator.ListItemsVisibilityCalculator;
+import com.volokh.danylo.visibility_utils.calculator.SingleListViewItemActiveCalculator;
+import com.volokh.danylo.visibility_utils.scroll_utils.RecyclerViewItemPositionGetter;
 
+import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, VideoPlayerManagerCallback {
+public class MainActivity extends AppCompatActivity {
 
-    private VideoPlayerView mVideoPlayer_1;
-    private ImageView mVideoCover;
-    private VideoPlayerView mVideoPlayer_2;
-    private ImageView mVideoCover2;
-    private static final String TAG = "MainActivity";
-    private MessagesHandlerThread mPlayerHandler;
-    MediaPlayerWrapper mediaPlayerWrapper;
+    private final VideoPlayerManager<MetaData> mVideoPlayerManager = new SingleVideoPlayerManager(new PlayerItemChangeListener() {
+        @Override
+        public void onPlayerItemChanged(MetaData metaData) {
+
+        }
+    });
+    protected RecyclerView.Adapter adapter;
+    RecyclerView rvVideoList;
+    private ListItemsVisibilityCalculator mListItemVisibilityCalculator;
+    private int mScrollState;
+    private RecyclerViewItemPositionGetter mItemsPositionGetter;
+    private ArrayList<Item> mList;
+    private LinearLayoutManager mLayoutManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mVideoPlayer_1 = (VideoPlayerView) findViewById(R.id.video_player_1);
-        mVideoPlayer_1.addMediaPlayerListener(new SimpleMainThreadMediaPlayerListener() {
+
+        rvVideoList = (RecyclerView) findViewById(R.id.rvVideoList);
+        mLayoutManager = getLayoutManager();
+        rvVideoList.setLayoutManager(mLayoutManager);
+        if (mLayoutManager != null) {
+            rvVideoList.addItemDecoration(new DividerItemDecoration(this,
+                    mLayoutManager.getOrientation()));
+        }
+        mList = new ArrayList<>();
+        mList.add(new Item("Title 1", "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4", mVideoPlayerManager, Picasso.with(this), R.mipmap.ic_launcher));
+        mList.add(new Item("Title 2", "http://techslides.com/demos/sample-videos/small.mp4", mVideoPlayerManager, Picasso.with(this), R.mipmap.ic_launcher));
+        mList.add(new Item("Title 3", "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4", mVideoPlayerManager, Picasso.with(this), R.mipmap.ic_launcher));
+        mList.add(new Item("Title 4", "http://techslides.com/demos/sample-videos/small.mp4", mVideoPlayerManager, Picasso.with(this), R.mipmap.ic_launcher));
+        adapter = getAdapter();
+        rvVideoList.setHasFixedSize(false);
+        rvVideoList.setAdapter(adapter);
+        mListItemVisibilityCalculator =
+                new SingleListViewItemActiveCalculator(new DefaultSingleItemCalculatorCallback(), mList);
+        rvVideoList.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
-            public void onVideoPreparedMainThread() {
-                // We hide the cover when video is prepared. Playback is about to start
-                Log.d(TAG, "onVideoPreparedMainThread() called");
-                mVideoCover.setVisibility(View.INVISIBLE);
+            public void onScrollStateChanged(RecyclerView recyclerView, int scrollState) {
+                mScrollState = scrollState;
+                if (scrollState == RecyclerView.SCROLL_STATE_IDLE && !mList.isEmpty()) {
+                    try {
+                        mListItemVisibilityCalculator.onScrollStateIdle(
+                                mItemsPositionGetter,
+                                mLayoutManager.findFirstVisibleItemPosition(),
+                                mLayoutManager.findLastVisibleItemPosition());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
             }
 
             @Override
-            public void onVideoStoppedMainThread() {
-                // We show the cover when video is stopped
-                Log.d(TAG, "onVideoStoppedMainThread() called");
-                mVideoCover.setVisibility(View.VISIBLE);
-            }
-
-            @Override
-            public void onVideoCompletionMainThread() {
-                // We show the cover when video is completed
-                Log.d(TAG, "onVideoCompletionMainThread() called");
-                mVideoCover.setVisibility(View.VISIBLE);
-            }
-
-            @Override
-            public void onErrorMainThread(int what, int extra) {
-                super.onErrorMainThread(what, extra);
-                Log.d(TAG, "onErrorMainThread() called with: what = [" + what + "], extra = [" + extra + "]");
-            }
-
-            @Override
-            public void onVideoSizeChangedMainThread(int width, int height) {
-                super.onVideoSizeChangedMainThread(width, height);
-                Log.d(TAG, "onVideoSizeChangedMainThread() called with: width = [" + width + "], height = [" + height + "]");
-            }
-
-            @Override
-            public void onBufferingUpdateMainThread(int percent) {
-                super.onBufferingUpdateMainThread(percent);
-                Log.d(TAG, "onBufferingUpdateMainThread() called with: percent = [" + percent + "]");
-            }
-        });
-
-        mVideoCover = (ImageView) findViewById(R.id.video_cover_1);
-        mVideoCover.setOnClickListener(this);
-
-        mVideoPlayer_2 = (VideoPlayerView) findViewById(R.id.video_player_2);
-        mVideoPlayer_2.addMediaPlayerListener(new SimpleMainThreadMediaPlayerListener() {
-            @Override
-            public void onVideoPreparedMainThread() {
-                // We hide the cover when video is prepared. Playback is about to start
-                mVideoCover2.setVisibility(View.INVISIBLE);
-            }
-
-            @Override
-            public void onVideoStoppedMainThread() {
-                // We show the cover when video is stopped
-                mVideoCover2.setVisibility(View.VISIBLE);
-            }
-
-            @Override
-            public void onVideoCompletionMainThread() {
-                // We show the cover when video is completed
-                mVideoCover2.setVisibility(View.VISIBLE);
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                if (!mList.isEmpty()) {
+                    try {
+                        mListItemVisibilityCalculator.onScroll(
+                                mItemsPositionGetter,
+                                mLayoutManager.findFirstVisibleItemPosition(),
+                                mLayoutManager.findLastVisibleItemPosition() - mLayoutManager.findFirstVisibleItemPosition() + 1,
+                                mScrollState);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         });
-        mVideoCover2 = (ImageView) findViewById(R.id.video_cover_2);
-        mVideoCover2.setOnClickListener(this);
-        mPlayerHandler = new MessagesHandlerThread();
-
-        (findViewById(R.id.stopAll)).setOnClickListener(this);
+        mItemsPositionGetter = new RecyclerViewItemPositionGetter(mLayoutManager, rvVideoList);
     }
 
-    VideoPlayerManager<MetaData> mVideoPlayerManager = new SingleVideoPlayerManager(new PlayerItemChangeListener() {
-        @Override
-        public void onPlayerItemChanged(MetaData metaData) {
-            Log.d(TAG, "onPlayerItemChanged() called with: metaData = [" + metaData + "]");
-        }
-    });
-
-    RecyclerView.LayoutManager getLayoutManager() {
+    LinearLayoutManager getLayoutManager() {
         return new LinearLayoutManager(MainActivity.this, LinearLayoutManager.VERTICAL, false);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
+    RecyclerView.Adapter getAdapter() {
+        return new Basic1Adapter(mVideoPlayerManager, MainActivity.this, mList);
     }
 
     @Override
@@ -134,49 +104,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
-    public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.video_cover_1:
-                mVideoPlayerManager.playNewVideo(new CurrentItemMetaData(0, mVideoPlayer_1), mVideoPlayer_1, "http://techslides.com/demos/sample-videos/small.mp4");
-                break;
-            case R.id.video_cover_2:
-                mVideoPlayerManager.playNewVideo(new CurrentItemMetaData(0, mVideoPlayer_2), mVideoPlayer_2, "http://techslides.com/demos/sample-videos/small.mp4");
-                break;
-            case R.id.stopAll:
-                pauseAll();
-                break;
-        }
-    }
-
-    private void pauseAll() {
-        try {
-            if (mVideoPlayer_1.getMediaPlayer() != null) {
-                if (mVideoPlayer_1.getCurrentState() == MediaPlayerWrapper.State.STARTED) {
-                    mPlayerHandler.addMessage(new PlayerInterface(mVideoPlayer_1, this, PlayerInterface.ACTION.ACTION_STOP));
-                }
-            }
-            if (mVideoPlayer_2.getMediaPlayer() != null) {
-                if (mVideoPlayer_2.getCurrentState() == MediaPlayerWrapper.State.STARTED) {
-                    mPlayerHandler.addMessage(new PlayerInterface(mVideoPlayer_2, this, PlayerInterface.ACTION.ACTION_STOP));
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    protected void onPause() {
+//        Toro.unregister(rvVideoList);
+        super.onPause();
     }
 
     @Override
-    public void setCurrentItem(MetaData currentItemMetaData, VideoPlayerView newPlayerView) {
-        Log.d(TAG, "setCurrentItem() called with: currentItemMetaData = [" + currentItemMetaData + "], newPlayerView = [" + newPlayerView + "]");
-    }
-
-    @Override
-    public void setVideoPlayerState(VideoPlayerView videoPlayerView, PlayerMessageState playerMessageState) {
-        Log.d(TAG, "setVideoPlayerState() called with: videoPlayerView = [" + videoPlayerView + "], playerMessageState = [" + playerMessageState + "]");
-    }
-
-    @Override
-    public PlayerMessageState getCurrentPlayerState() {
-        return null;
+    protected void onResume() {
+        super.onResume();
+//        Toro.register(rvVideoList);
     }
 }
