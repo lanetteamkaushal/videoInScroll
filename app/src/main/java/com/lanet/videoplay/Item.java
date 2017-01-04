@@ -1,6 +1,7 @@
 package com.lanet.videoplay;
 
 import android.graphics.Rect;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,7 +23,7 @@ import com.volokh.danylo.visibility_utils.items.ListItem;
 public class Item implements ListItem, VideoItem {
 
 
-    private static final boolean SHOW_LOGS = false;
+    private static final boolean SHOW_LOGS = true;
     private static final String TAG = Item.class.getSimpleName();
     private final String mDirectUrl;
     private final String mTitle;
@@ -46,12 +47,14 @@ public class Item implements ListItem, VideoItem {
     }
 
     public void update(int position, VideoViewHolder viewHolder, VideoPlayerManager videoPlayerManager) {
+        Log.d(TAG, "update() called with: position = [" + position + "], viewHolder = [" + viewHolder + "], videoPlayerManager = [" + videoPlayerManager + "]");
         viewHolder.mTitle.setText(mTitle);
         viewHolder.mCover.setVisibility(View.VISIBLE);
         mImageLoader.load(mImageResource).into(viewHolder.mCover);
     }
 
     public View createView(ViewGroup parent, int screenWidth) {
+        Log.d(TAG, "createView() called with: parent = [" + parent + "], screenWidth = [" + screenWidth + "]");
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.video_item, parent, false);
         ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
         layoutParams.height = screenWidth;
@@ -131,17 +134,20 @@ public class Item implements ListItem, VideoItem {
 
     @Override
     public void setActive(View newActiveView, int newActiveViewPosition) {
+        Log.d(TAG, "setActive() called with: newActiveView = [" + newActiveView + "], newActiveViewPosition = [" + newActiveViewPosition + "]");
         VideoViewHolder viewHolder = (VideoViewHolder) newActiveView.getTag();
         playNewVideo(new CurrentItemMetaData(newActiveViewPosition, newActiveView), viewHolder.mPlayer, mVideoPlayerManager);
     }
 
     @Override
     public void playNewVideo(MetaData currentItemMetaData, VideoPlayerView player, VideoPlayerManager<MetaData> videoPlayerManager) {
+        Log.d(TAG, "playNewVideo() called with: currentItemMetaData = [" + currentItemMetaData + "], player = [" + player + "], videoPlayerManager = [" + videoPlayerManager + "]");
         videoPlayerManager.playNewVideo(currentItemMetaData, player, mDirectUrl);
     }
 
     @Override
     public void stopPlayback(VideoPlayerManager videoPlayerManager) {
+        Log.d(TAG, "stopPlayback() called with: videoPlayerManager = [" + videoPlayerManager + "]");
         videoPlayerManager.stopAnyPlayback();
     }
 
