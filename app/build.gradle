@@ -1,0 +1,41 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 25
+    buildToolsVersion "25.0.1"
+    defaultConfig {
+        applicationId "com.lanet.videoplay"
+        minSdkVersion 16
+        targetSdkVersion 25
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    compile 'com.android.support:appcompat-v7:25.1.0'
+    testCompile 'junit:junit:4.12'
+    // include in your module (app or library)
+    // include only core Toro library
+    compile "im.ene.toro2:toro:${toroVersion}"
+    // include extension for ExoPlayer v2 (Toro is included already)
+    compile "im.ene.toro2:toro-ext-exoplayer2:${toroVersion}"
+    // include extension for ExoPlayer v1 (Toro is included already)
+    compile "im.ene.toro2:toro-ext-exoplayer:${toroVersion}"
+    // include extension for Legacy MediaPlayer (Toro is included already)
+    compile "im.ene.toro2:toro-ext-mediaplayer:${toroVersion}"
+    // include Toro extended helper (Toro and ExoPlayer v2 extension is included already)
+    compile "im.ene.toro2:toro-extended:${toroVersion}"
+    compile 'com.android.support:recyclerview-v7:25.1.0'
+}
