@@ -1,6 +1,7 @@
 package com.volokh.danylo.video_player_manager.manager;
 
 import android.content.res.AssetFileDescriptor;
+import android.net.Uri;
 
 import com.volokh.danylo.video_player_manager.Config;
 import com.volokh.danylo.video_player_manager.MessagesHandlerThread;
@@ -15,6 +16,7 @@ import com.volokh.danylo.video_player_manager.playermessages.Reset;
 import com.volokh.danylo.video_player_manager.playermessages.SetAssetsDataSourceMessage;
 import com.volokh.danylo.video_player_manager.playermessages.SetUrlDataSourceMessage;
 import com.volokh.danylo.video_player_manager.playermessages.Stop;
+import com.volokh.danylo.video_player_manager.playermessages.setUriDataSourceMessage;
 import com.volokh.danylo.video_player_manager.ui.MediaPlayerWrapper;
 import com.volokh.danylo.video_player_manager.ui.VideoPlayerView;
 import com.volokh.danylo.video_player_manager.utils.Logger;
@@ -37,10 +39,9 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
     private final MessagesHandlerThread mPlayerHandler = new MessagesHandlerThread();
 
     /**
-     * When {@link SingleVideoPlayerManager} actually switches the player
-     * (Switching the player can take a while: we have to stop previous player then start another),
-     * then it calls {@link PlayerItemChangeListener#onPlayerItemChanged(MetaData)}}
-     * To notify that player was switched.
+     * When {@link SingleVideoPlayerManager} actually switches the player (Switching the player can
+     * take a while: we have to stop previous player then start another), then it calls {@link
+     * PlayerItemChangeListener#onPlayerItemChanged(MetaData)}} To notify that player was switched.
      */
     private final PlayerItemChangeListener mPlayerItemChangeListener;
 
@@ -54,20 +55,18 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
     /**
      * Call it if you have direct url or path to video source
      *
-     * The logic is following:
-     * 1. Stop queue processing to have consistent state of queue when posting new messages
-     * 2. Check if current player is active.
-     * 3. If it is active and already playing current video we do nothing
-     * 4. If not active then start new playback
-     * 5. Resume stopped queue
+     * The logic is following: 1. Stop queue processing to have consistent state of queue when
+     * posting new messages 2. Check if current player is active. 3. If it is active and already
+     * playing current video we do nothing 4. If not active then start new playback 5. Resume
+     * stopped queue
      *
-     * @param currentItemMetaData
      * @param videoPlayerView - the actual video player
-     * @param videoUrl - the link to the video source
+     * @param videoUrl        - the link to the video source
      */
     @Override
     public void playNewVideo(MetaData currentItemMetaData, VideoPlayerView videoPlayerView, String videoUrl) {
-        if(SHOW_LOGS) Logger.v(TAG, ">> playNewVideo, videoPlayer " + videoPlayerView + ", mCurrentPlayer " + mCurrentPlayer + ", videoPlayerView " + videoPlayerView);
+        if (SHOW_LOGS)
+            Logger.v(TAG, ">> playNewVideo, videoPlayer " + videoPlayerView + ", mCurrentPlayer " + mCurrentPlayer + ", videoPlayerView " + videoPlayerView);
 
         /** 1. */
         mPlayerHandler.pauseQueueProcessing(TAG);
@@ -77,8 +76,10 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
                 mCurrentPlayer != null &&
                         videoUrl.equals(mCurrentPlayer.getVideoUrlDataSource());
 
-        if (SHOW_LOGS) Logger.v(TAG, "playNewVideo, isAlreadyPlayingTheFile " + isAlreadyPlayingTheFile);
-        if (SHOW_LOGS) Logger.v(TAG, "playNewVideo, currentPlayerIsActive " + currentPlayerIsActive);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "playNewVideo, isAlreadyPlayingTheFile " + isAlreadyPlayingTheFile);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "playNewVideo, currentPlayerIsActive " + currentPlayerIsActive);
         /** 2. */
 //        if(currentPlayerIsActive){
 //
@@ -119,30 +120,52 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
         /** 5. */
         mPlayerHandler.resumeQueueProcessing(TAG);
 
-        if(SHOW_LOGS) Logger.v(TAG, "<< playNewVideo, videoPlayer " + videoPlayerView + ", videoUrl " + videoUrl);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "<< playNewVideo, videoPlayer " + videoPlayerView + ", videoUrl " + videoUrl);
+    }
+
+    //kfix playing url from here
+    @Override
+    public void playNewVideo(MetaData currentItemMetaData, VideoPlayerView videoPlayerView, Uri videoUrl) {
+        if (SHOW_LOGS)
+            Logger.v(TAG, ">> playNewVideo, videoPlayer " + videoPlayerView + ", mCurrentPlayer " + mCurrentPlayer + ", videoPlayerView " + videoPlayerView);
+
+        mPlayerHandler.pauseQueueProcessing(TAG);
+
+        boolean currentPlayerIsActive = currentItemMetaData.isMorePlayView() && mCurrentPlayer == videoPlayerView;
+        boolean isAlreadyPlayingTheFile =
+                mCurrentPlayer != null &&
+                        videoUrl.equals(mCurrentPlayer.getmUri());
+
+        if (SHOW_LOGS)
+            Logger.v(TAG, "playNewVideo, isAlreadyPlayingTheFile " + isAlreadyPlayingTheFile);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "playNewVideo, currentPlayerIsActive " + currentPlayerIsActive);
+        startNewPlayback(currentItemMetaData, videoPlayerView, videoUrl);
+        mPlayerHandler.resumeQueueProcessing(TAG);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "<< playNewVideo, videoPlayer " + videoPlayerView + ", videoUrl " + videoUrl);
     }
 
     /**
      * Call it if you have direct url or path to video source
      *
-     * The logic is following:
-     * 1. Stop queue processing to have consistent state of queue when posting new messages
-     * 2. Check if current player is active.
-     * 3. If it is active and already playing current video we pause it or start again
-     * 4. If not active then start new playback
-     * 5. Resume stopped queue
+     * The logic is following: 1. Stop queue processing to have consistent state of queue when
+     * posting new messages 2. Check if current player is active. 3. If it is active and already
+     * playing current video we pause it or start again 4. If not active then start new playback 5.
+     * Resume stopped queue
      *
-     * This method is basically a copy-paste of {@link #playNewVideo(MetaData, VideoPlayerView, String)}
-     * TODO: define a better interface to divide these two methods
+     * This method is basically a copy-paste of {@link #playNewVideo(MetaData, VideoPlayerView,
+     * String)} TODO: define a better interface to divide these two methods
      *
-     * @param currentItemMetaData
-     * @param videoPlayerView - the actual video player
+     * @param videoPlayerView     - the actual video player
      * @param assetFileDescriptor - the asset descriptor for source file
      */
     @Override
     public void playNewVideo(MetaData currentItemMetaData, VideoPlayerView videoPlayerView, AssetFileDescriptor assetFileDescriptor) {
-        if(SHOW_LOGS) Logger.v(TAG, ">> playNewVideo, videoPlayer " + videoPlayerView + ", mCurrentPlayer " + mCurrentPlayer + ", assetFileDescriptor " + assetFileDescriptor);
-        if(SHOW_LOGS) Logger.v(TAG, "playNewVideo, currentItemMetaData " + currentItemMetaData);
+        if (SHOW_LOGS)
+            Logger.v(TAG, ">> playNewVideo, videoPlayer " + videoPlayerView + ", mCurrentPlayer " + mCurrentPlayer + ", assetFileDescriptor " + assetFileDescriptor);
+        if (SHOW_LOGS) Logger.v(TAG, "playNewVideo, currentItemMetaData " + currentItemMetaData);
 
         /** 1. */
         mPlayerHandler.pauseQueueProcessing(TAG);
@@ -150,22 +173,25 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
         boolean currentPlayerIsActive = mCurrentPlayer == videoPlayerView;
         boolean isAlreadyPlayingTheFile =
                 mCurrentPlayer != null &&
-                mCurrentPlayer.getAssetFileDescriptorDataSource() == assetFileDescriptor;
+                        mCurrentPlayer.getAssetFileDescriptorDataSource() == assetFileDescriptor;
 
-        if (SHOW_LOGS) Logger.v(TAG, "playNewVideo, isAlreadyPlayingTheFile " + isAlreadyPlayingTheFile);
-        if (SHOW_LOGS) Logger.v(TAG, "playNewVideo, currentPlayerIsActive " + currentPlayerIsActive);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "playNewVideo, isAlreadyPlayingTheFile " + isAlreadyPlayingTheFile);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "playNewVideo, currentPlayerIsActive " + currentPlayerIsActive);
         /** 2. */
-        if(currentPlayerIsActive){
+        if (currentPlayerIsActive) {
 
-            if(isAlreadyPlayingTheFile){
-                if(isInPlaybackState()){
-                    if(SHOW_LOGS) Logger.v(TAG, "playNewVideo, videoPlayer " + videoPlayerView + " is already in state " + mCurrentPlayerState);
+            if (isAlreadyPlayingTheFile) {
+                if (isInPlaybackState()) {
+                    if (SHOW_LOGS)
+                        Logger.v(TAG, "playNewVideo, videoPlayer " + videoPlayerView + " is already in state " + mCurrentPlayerState);
                     /** 3. */
                     videoPlayerView.getMediaPlayer().pause();
-                }else if(isInPauseState()){
+                } else if (isInPauseState()) {
                     /** 3. */
                     videoPlayerView.getMediaPlayer().start();
-                }else {
+                } else {
                     startNewPlayback(currentItemMetaData, videoPlayerView, assetFileDescriptor);
                 }
             }
@@ -177,38 +203,35 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
         /** 5. */
         mPlayerHandler.resumeQueueProcessing(TAG);
 
-        if(SHOW_LOGS) Logger.v(TAG, "<< playNewVideo, videoPlayer " + videoPlayerView + ", assetFileDescriptor " + assetFileDescriptor);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "<< playNewVideo, videoPlayer " + videoPlayerView + ", assetFileDescriptor " + assetFileDescriptor);
     }
 
     private boolean isInPlaybackState() {
         boolean isPlaying = mCurrentPlayerState == PlayerMessageState.STARTED || mCurrentPlayerState == PlayerMessageState.STARTING;
-        if(SHOW_LOGS) Logger.v(TAG, "isInPlaybackState, " + isPlaying);
+        if (SHOW_LOGS) Logger.v(TAG, "isInPlaybackState, " + isPlaying);
         return isPlaying;
     }
 
-    private boolean isInPauseState(){
+    private boolean isInPauseState() {
         return mCurrentPlayerState == PlayerMessageState.PAUSING || mCurrentPlayerState == PlayerMessageState.PAUSED;
     }
 
     /**
      * In order to start new playback we have to do few steps in specific order:
      *
-     * Before calling this method the queue processing should be stopped
-     * 1. Clear all pending messages from the queue
-     * 2. Post messages that will Stop, Reset, Release and clear current instance of Video Player
-     * "Clear instance" means removing instance of {@link android.media.MediaPlayer} and not the {@link VideoPlayerView}
-     * 3. Set new view player of which become active.
-     * 4. Post messages to start new playback
-     *
-     * @param currentItemMetaData
-     * @param videoPlayerView
-     * @param assetFileDescriptor
+     * Before calling this method the queue processing should be stopped 1. Clear all pending
+     * messages from the queue 2. Post messages that will Stop, Reset, Release and clear current
+     * instance of Video Player "Clear instance" means removing instance of {@link
+     * android.media.MediaPlayer} and not the {@link VideoPlayerView} 3. Set new view player of
+     * which become active. 4. Post messages to start new playback
      */
     private void startNewPlayback(MetaData currentItemMetaData, VideoPlayerView videoPlayerView, AssetFileDescriptor assetFileDescriptor) {
         // set listener for new player
         // TODO: find a place when we can remove this listener.
         videoPlayerView.addMediaPlayerListener(this);
-        if (SHOW_LOGS) Logger.v(TAG, "startNewPlayback, mCurrentPlayerState " + mCurrentPlayerState);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "startNewPlayback, mCurrentPlayerState " + mCurrentPlayerState);
 
         /** 1. */
         mPlayerHandler.clearAllPendingMessages(TAG);
@@ -220,81 +243,8 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
         startPlayback(videoPlayerView, assetFileDescriptor);
     }
 
-    /**
-     * This is copy paste of {@link #startNewPlayback(MetaData, VideoPlayerView, AssetFileDescriptor)}
-     * The difference is that this method uses AssetFileDescriptor instead of direct path
-     */
-    private void startNewPlayback(MetaData currentItemMetaData, VideoPlayerView videoPlayerView, String videoUrl) {
-        // set listener for new player
-        // TODO: find a place when we have to remove this listener.
-        videoPlayerView.addMediaPlayerListener(this);
-        if (SHOW_LOGS) Logger.v(TAG, "startNewPlayback, mCurrentPlayerState " + mCurrentPlayerState);
-
-        mPlayerHandler.clearAllPendingMessages(TAG);
-
-        stopResetReleaseClearCurrentPlayer();
-        setNewViewForPlayback(currentItemMetaData, videoPlayerView);
-        startPlayback(videoPlayerView, videoUrl);
-    }
-
-    /**
-     * This method stops playback if one exists.
-     */
-    @Override
-    public void stopAnyPlayback() {
-        if(SHOW_LOGS) Logger.v(TAG, ">> stopAnyPlayback, mCurrentPlayerState " + mCurrentPlayerState);
-
-        mPlayerHandler.pauseQueueProcessing(TAG);
-        if (SHOW_LOGS) Logger.v(TAG, "stopAnyPlayback, mCurrentPlayerState " + mCurrentPlayerState);
-
-        mPlayerHandler.clearAllPendingMessages(TAG);
-//        if(mCurrentPlayerState == PlayerMessageState.PREPARED)
-        stopResetReleaseClearCurrentPlayer();
-
-        mPlayerHandler.resumeQueueProcessing(TAG);
-
-        if(SHOW_LOGS) Logger.v(TAG, "<< stopAnyPlayback, mCurrentPlayerState " + mCurrentPlayerState);
-    }
-
-    /**
-     * This method stops current playback and resets MediaPlayer.
-     * Call it when you no longer need it.
-     */
-    @Override
-    public void resetMediaPlayer() {
-        if(SHOW_LOGS) Logger.v(TAG, ">> resetMediaPlayer, mCurrentPlayerState " + mCurrentPlayerState);
-
-
-        mPlayerHandler.pauseQueueProcessing(TAG);
-        if (SHOW_LOGS) Logger.v(TAG, "resetMediaPlayer, mCurrentPlayerState " + mCurrentPlayerState);
-        mPlayerHandler.clearAllPendingMessages(TAG);
-        resetReleaseClearCurrentPlayer();
-
-        mPlayerHandler.resumeQueueProcessing(TAG);
-
-        if(SHOW_LOGS) Logger.v(TAG, "<< resetMediaPlayer, mCurrentPlayerState " + mCurrentPlayerState);
-    }
-
-    /**
-     * This method posts a set of messages to {@link MessagesHandlerThread} in order
-     * to start new playback
-     *
-     * @param videoPlayerView - video player view which should start playing
-     * @param videoUrl - a source path
-     */
-    private void startPlayback(VideoPlayerView videoPlayerView, String videoUrl) {
-        if(SHOW_LOGS) Logger.v(TAG, "startPlayback");
-
-        mPlayerHandler.addMessages(Arrays.asList(
-                new CreateNewPlayerInstance(videoPlayerView, this),
-                new SetUrlDataSourceMessage(videoPlayerView, videoUrl, this),
-                new Prepare(videoPlayerView, this)
-//                new Start(videoPlayerView, this)
-        ));
-    }
-
     private void startPlayback(VideoPlayerView videoPlayerView, AssetFileDescriptor assetFileDescriptor) {
-        if(SHOW_LOGS) Logger.v(TAG, "startPlayback");
+        if (SHOW_LOGS) Logger.v(TAG, "startPlayback");
 
         mPlayerHandler.addMessages(Arrays.asList(
                 new CreateNewPlayerInstance(videoPlayerView, this),
@@ -305,22 +255,150 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
     }
 
     /**
-     * This method posts a message that will eventually call {@link PlayerItemChangeListener#onPlayerItemChanged(MetaData)}
-     * When current player is stopped and new player is about to be active this message sets new player
+     * This method stops playback if one exists.
      */
-    private void setNewViewForPlayback(MetaData currentItemMetaData, VideoPlayerView videoPlayerView) {
-        if(SHOW_LOGS) Logger.v(TAG, "setNewViewForPlayback, currentItemMetaData " + currentItemMetaData + ", videoPlayer " + videoPlayerView);
-        mPlayerHandler.addMessage(new SetNewViewForPlayback(currentItemMetaData, videoPlayerView, this));
+    @Override
+    public void stopAnyPlayback() {
+        if (SHOW_LOGS)
+            Logger.v(TAG, ">> stopAnyPlayback, mCurrentPlayerState " + mCurrentPlayerState);
+
+        mPlayerHandler.pauseQueueProcessing(TAG);
+        if (SHOW_LOGS) Logger.v(TAG, "stopAnyPlayback, mCurrentPlayerState " + mCurrentPlayerState);
+
+        mPlayerHandler.clearAllPendingMessages(TAG);
+//        if(mCurrentPlayerState == PlayerMessageState.PREPARED)
+        stopResetReleaseClearCurrentPlayer();
+
+        mPlayerHandler.resumeQueueProcessing(TAG);
+
+        if (SHOW_LOGS)
+            Logger.v(TAG, "<< stopAnyPlayback, mCurrentPlayerState " + mCurrentPlayerState);
     }
 
     /**
-     * This method posts a set of messages to {@link MessagesHandlerThread}
-     * in order to stop current playback
+     * This method stops current playback and resets MediaPlayer. Call it when you no longer need
+     * it.
+     */
+    @Override
+    public void resetMediaPlayer() {
+        if (SHOW_LOGS)
+            Logger.v(TAG, ">> resetMediaPlayer, mCurrentPlayerState " + mCurrentPlayerState);
+
+
+        mPlayerHandler.pauseQueueProcessing(TAG);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "resetMediaPlayer, mCurrentPlayerState " + mCurrentPlayerState);
+        mPlayerHandler.clearAllPendingMessages(TAG);
+        resetReleaseClearCurrentPlayer();
+
+        mPlayerHandler.resumeQueueProcessing(TAG);
+
+        if (SHOW_LOGS)
+            Logger.v(TAG, "<< resetMediaPlayer, mCurrentPlayerState " + mCurrentPlayerState);
+    }
+
+    private void resetReleaseClearCurrentPlayer() {
+        if (SHOW_LOGS)
+            Logger.v(TAG, "resetReleaseClearCurrentPlayer, mCurrentPlayerState " + mCurrentPlayerState + ", mCurrentPlayer " + mCurrentPlayer);
+
+        switch (mCurrentPlayerState) {
+            case SETTING_NEW_PLAYER:
+            case IDLE:
+
+            case CREATING_PLAYER_INSTANCE:
+            case PLAYER_INSTANCE_CREATED:
+
+            case SETTING_DATA_SOURCE:
+            case DATA_SOURCE_SET:
+
+            case CLEARING_PLAYER_INSTANCE:
+            case PLAYER_INSTANCE_CLEARED:
+                break;
+            case INITIALIZED:
+            case PREPARING:
+            case PREPARED:
+            case STARTING:
+            case STARTED:
+            case PAUSING:
+            case PAUSED:
+            case STOPPING:
+            case STOPPED:
+            case ERROR: // reset if error
+            case PLAYBACK_COMPLETED:
+                mPlayerHandler.addMessage(new Reset(mCurrentPlayer, this));
+                //FALL-THROUGH
+            case RESETTING:
+            case RESET:
+                mPlayerHandler.addMessage(new Release(mCurrentPlayer, this));
+                //FALL-THROUGH
+            case RELEASING:
+            case RELEASED:
+                mPlayerHandler.addMessage(new ClearPlayerInstance(mCurrentPlayer, this));
+
+                break;
+            case END:
+                throw new RuntimeException("unhandled " + mCurrentPlayerState);
+        }
+    }
+
+    /**
+     * This is copy paste of {@link #startNewPlayback(MetaData, VideoPlayerView,
+     * AssetFileDescriptor)} The difference is that this method uses AssetFileDescriptor instead of
+     * direct path
+     */
+    private void startNewPlayback(MetaData currentItemMetaData, VideoPlayerView videoPlayerView, Uri videoUrl) {
+        // set listener for new player
+        // TODO: find a place when we have to remove this listener.
+        videoPlayerView.addMediaPlayerListener(this);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "startNewPlayback, mCurrentPlayerState " + mCurrentPlayerState);
+
+        mPlayerHandler.clearAllPendingMessages(TAG);
+
+        stopResetReleaseClearCurrentPlayer();
+        setNewViewForPlayback(currentItemMetaData, videoPlayerView);
+        startPlayback(videoPlayerView, videoUrl);
+    }
+
+    private void startPlayback(VideoPlayerView videoPlayerView, Uri videoUrl) {
+        if (SHOW_LOGS) Logger.v(TAG, "startPlayback");
+
+        mPlayerHandler.addMessages(Arrays.asList(
+                new CreateNewPlayerInstance(videoPlayerView, this),
+                new setUriDataSourceMessage(videoPlayerView, videoUrl, this),
+                new Prepare(videoPlayerView, this)
+//                new Start(videoPlayerView, this)
+        ));
+    }
+
+    /**
+     * This is copy paste of {@link #startNewPlayback(MetaData, VideoPlayerView,
+     * AssetFileDescriptor)} The difference is that this method uses AssetFileDescriptor instead of
+     * direct path
+     */
+    private void startNewPlayback(MetaData currentItemMetaData, VideoPlayerView videoPlayerView, String videoUrl) {
+        // set listener for new player
+        // TODO: find a place when we have to remove this listener.
+        videoPlayerView.addMediaPlayerListener(this);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "startNewPlayback, mCurrentPlayerState " + mCurrentPlayerState);
+
+        mPlayerHandler.clearAllPendingMessages(TAG);
+
+        stopResetReleaseClearCurrentPlayer();
+        setNewViewForPlayback(currentItemMetaData, videoPlayerView);
+        startPlayback(videoPlayerView, videoUrl);
+    }
+
+    /**
+     * This method posts a set of messages to {@link MessagesHandlerThread} in order to stop current
+     * playback
      */
     private void stopResetReleaseClearCurrentPlayer() {
-        if(SHOW_LOGS) Logger.v(TAG, "stopResetReleaseClearCurrentPlayer, mCurrentPlayerState " + mCurrentPlayerState +", mCurrentPlayer " + mCurrentPlayer);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "stopResetReleaseClearCurrentPlayer, mCurrentPlayerState " + mCurrentPlayerState + ", mCurrentPlayer " + mCurrentPlayer);
 
-        switch (mCurrentPlayerState){
+        switch (mCurrentPlayerState) {
             case SETTING_NEW_PLAYER:
             case IDLE:
 
@@ -365,83 +443,72 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
         }
     }
 
-    private void resetReleaseClearCurrentPlayer() {
-        if(SHOW_LOGS) Logger.v(TAG, "resetReleaseClearCurrentPlayer, mCurrentPlayerState " + mCurrentPlayerState +", mCurrentPlayer " + mCurrentPlayer);
-
-        switch (mCurrentPlayerState){
-            case SETTING_NEW_PLAYER:
-            case IDLE:
-
-            case CREATING_PLAYER_INSTANCE:
-            case PLAYER_INSTANCE_CREATED:
-
-            case SETTING_DATA_SOURCE:
-            case DATA_SOURCE_SET:
-
-            case CLEARING_PLAYER_INSTANCE:
-            case PLAYER_INSTANCE_CLEARED:
-                break;
-            case INITIALIZED:
-            case PREPARING:
-            case PREPARED:
-            case STARTING:
-            case STARTED:
-            case PAUSING:
-            case PAUSED:
-            case STOPPING:
-            case STOPPED:
-            case ERROR: // reset if error
-            case PLAYBACK_COMPLETED:
-                mPlayerHandler.addMessage(new Reset(mCurrentPlayer, this));
-                //FALL-THROUGH
-            case RESETTING:
-            case RESET:
-                mPlayerHandler.addMessage(new Release(mCurrentPlayer, this));
-                //FALL-THROUGH
-            case RELEASING:
-            case RELEASED:
-                mPlayerHandler.addMessage(new ClearPlayerInstance(mCurrentPlayer, this));
-
-                break;
-            case END:
-                throw new RuntimeException("unhandled " + mCurrentPlayerState);
-        }
+    /**
+     * This method posts a message that will eventually call {@link PlayerItemChangeListener#onPlayerItemChanged(MetaData)}
+     * When current player is stopped and new player is about to be active this message sets new
+     * player
+     */
+    private void setNewViewForPlayback(MetaData currentItemMetaData, VideoPlayerView videoPlayerView) {
+        if (SHOW_LOGS)
+            Logger.v(TAG, "setNewViewForPlayback, currentItemMetaData " + currentItemMetaData + ", videoPlayer " + videoPlayerView);
+        mPlayerHandler.addMessage(new SetNewViewForPlayback(currentItemMetaData, videoPlayerView, this));
     }
 
     /**
-     * This method is called by {@link SetNewViewForPlayback} message when new player becomes active.
-     * Then it passes that knowledge to the {@link #mPlayerItemChangeListener}
+     * This method posts a set of messages to {@link MessagesHandlerThread} in order to start new
+     * playback
      *
+     * @param videoPlayerView - video player view which should start playing
+     * @param videoUrl        - a source path
+     */
+    private void startPlayback(VideoPlayerView videoPlayerView, String videoUrl) {
+        if (SHOW_LOGS) Logger.v(TAG, "startPlayback");
+
+        mPlayerHandler.addMessages(Arrays.asList(
+                new CreateNewPlayerInstance(videoPlayerView, this),
+                new SetUrlDataSourceMessage(videoPlayerView, videoUrl, this),
+                new Prepare(videoPlayerView, this)
+//                new Start(videoPlayerView, this)
+        ));
+    }
+
+    /**
+     * This method is called by {@link SetNewViewForPlayback} message when new player becomes
+     * active. Then it passes that knowledge to the {@link #mPlayerItemChangeListener}
      */
     @Override
     public void setCurrentItem(MetaData currentItemMetaData, VideoPlayerView videoPlayerView) {
-        if(SHOW_LOGS) Logger.v(TAG, ">> onPlayerItemChanged");
+        if (SHOW_LOGS) Logger.v(TAG, ">> onPlayerItemChanged");
 
         mCurrentPlayer = videoPlayerView;
-        if(mPlayerItemChangeListener != null)
-          mPlayerItemChangeListener.onPlayerItemChanged(currentItemMetaData);
+        if (mPlayerItemChangeListener != null)
+            mPlayerItemChangeListener.onPlayerItemChanged(currentItemMetaData);
 
-        if(SHOW_LOGS) Logger.v(TAG, "<< onPlayerItemChanged");
+        if (SHOW_LOGS) Logger.v(TAG, "<< onPlayerItemChanged");
     }
 
     /**
-     * This method is called by {@link com.pp.assistant.videomanage.playermessages.PlayerMessage}
      * When video player state changes.
-     * @param videoPlayerView - a video player which stated changed
-     * @param playerMessageState - new state of player. The state is then used when posting new messages
+     *
+     * @param videoPlayerView    - a video player which stated changed
+     * @param playerMessageState - new state of player. The state is then used when posting new
+     *                           messages
      */
     @Override
     public void setVideoPlayerState(VideoPlayerView videoPlayerView, PlayerMessageState playerMessageState) {
-        if(SHOW_LOGS) Logger.v(TAG, ">> setVideoPlayerState, playerMessageState " + playerMessageState + ", videoPlayer " + videoPlayerView);
+        if (SHOW_LOGS)
+            Logger.v(TAG, ">> setVideoPlayerState, playerMessageState " + playerMessageState + ", videoPlayer " + videoPlayerView);
 
         mCurrentPlayerState = playerMessageState;
 
-        if(SHOW_LOGS) Logger.v(TAG, "<< setVideoPlayerState, playerMessageState " + playerMessageState + ", videoPlayer " + videoPlayerView);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "<< setVideoPlayerState, playerMessageState " + playerMessageState + ", videoPlayer " + videoPlayerView);
     }
 
     @Override
     public PlayerMessageState getCurrentPlayerState() {
-        if(SHOW_LOGS) Logger.v(TAG, "getCurrentPlayerState, mCurrentPlayerState " + mCurrentPlayerState);
+        if (SHOW_LOGS)
+            Logger.v(TAG, "getCurrentPlayerState, mCurrentPlayerState " + mCurrentPlayerState);
         return mCurrentPlayerState;
     }
 
@@ -460,11 +527,11 @@ public class SingleVideoPlayerManager implements VideoPlayerManager<MetaData>, V
 
     @Override
     public void onErrorMainThread(int what, int extra) {
-        if(SHOW_LOGS) Logger.v(TAG, "onErrorMainThread, what " + what + ", extra " + extra);
+        if (SHOW_LOGS) Logger.v(TAG, "onErrorMainThread, what " + what + ", extra " + extra);
 
         /** if error happen during playback, we need to set error state.
          * Because we cannot run some messages in Error state
-        for example {@link Stop}*/
+         for example {@link Stop}*/
         mCurrentPlayerState = PlayerMessageState.ERROR;
     }
 

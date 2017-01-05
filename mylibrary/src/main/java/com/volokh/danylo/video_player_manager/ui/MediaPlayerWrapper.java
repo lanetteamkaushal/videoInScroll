@@ -17,9 +17,7 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * This class encapsulates {@link MediaPlayer}
- * and follows this use-case diagram:
- * <p>
+ * This class encapsulates {@link MediaPlayer} and follows this use-case diagram: <p>
  * http://developer.android.com/reference/android/media/MediaPlayer.html
  */
 public abstract class MediaPlayerWrapper
@@ -29,31 +27,31 @@ public abstract class MediaPlayerWrapper
         MediaPlayer.OnCompletionListener,
         MediaPlayer.OnVideoSizeChangedListener, MediaPlayer.OnPreparedListener {
 
-    private String TAG;
-    private static final boolean SHOW_LOGS = Config.SHOW_LOGS;
     public static final String VIDEO_TAG = "VIDEO_TAG";
-
     public static final int POSITION_UPDATE_NOTIFYING_PERIOD = 1000;         // milliseconds
-    private Surface mSurface;
-
-    public enum State {
-        IDLE,
-        INITIALIZED,
-        PREPARING,
-        PREPARED,
-        STARTED,
-        PAUSED,
-        STOPPED,
-        PLAYBACK_COMPLETED,
-        END,
-        ERROR
-    }
-
+    private static final boolean SHOW_LOGS = Config.SHOW_LOGS;
     private final Handler mMainThreadHandler = new Handler(Looper.getMainLooper());
     private final MediaPlayer mMediaPlayer;
     private final AtomicReference<State> mState = new AtomicReference<>();
-
+    private String TAG;
+    private Surface mSurface;
     private MainThreadMediaPlayerListener mListener;
+    private final Runnable mOnVideoPreparedMessage = new Runnable() {
+        @Override
+        public void run() {
+            if (SHOW_LOGS) Logger.v(TAG, ">> run, onVideoPreparedMainThread");
+            mListener.onVideoPreparedMainThread();
+            if (SHOW_LOGS) Logger.v(TAG, "<< run, onVideoPreparedMainThread");
+        }
+    };
+    private final Runnable mOnVideoStopMessage = new Runnable() {
+        @Override
+        public void run() {
+            if (SHOW_LOGS) Logger.v(TAG, ">> run, onVideoStoppedMainThread");
+            mListener.onVideoStoppedMainThread();
+            if (SHOW_LOGS) Logger.v(TAG, "<< run, onVideoStoppedMainThread");
+        }
+    };
     private Context mContext;
 
     protected MediaPlayerWrapper(MediaPlayer mediaPlayer, Context context) {
@@ -80,14 +78,10 @@ public abstract class MediaPlayerWrapper
         mMediaPlayer.setScreenOnWhilePlaying(true);
     }
 
-    private final Runnable mOnVideoPreparedMessage = new Runnable() {
-        @Override
-        public void run() {
-            if (SHOW_LOGS) Logger.v(TAG, ">> run, onVideoPreparedMainThread");
-            mListener.onVideoPreparedMainThread();
-            if (SHOW_LOGS) Logger.v(TAG, "<< run, onVideoPreparedMainThread");
-        }
-    };
+    public static int positionToPercent(int progressMillis, int durationMillis) {
+        float percentPrecise = (float) progressMillis / (float) durationMillis * 100f;
+        return Math.round(percentPrecise);
+    }
 
     public void prepare() {
         if (SHOW_LOGS) Logger.v(TAG, ">> execute prepare, mState " + mState);
@@ -103,7 +97,6 @@ public abstract class MediaPlayerWrapper
         }
     }
 
-
     @Override
     public void onPrepared(MediaPlayer mp) {
         if (SHOW_LOGS) Logger.v(TAG, ">> onPrepared");
@@ -118,6 +111,23 @@ public abstract class MediaPlayerWrapper
     }
 
     /**
+     * Play or resume video. Video will be played as soon as view is available and media player is
+     * prepared.
+     * <p/>
+     * If video is stopped or ended and play() method was called, video will start over.
+     */
+    public void start() {
+        if (SHOW_LOGS) Logger.v(TAG, ">> start");
+
+        synchronized (mState) {
+            if (SHOW_LOGS) Logger.v(TAG, "start, mState " + mState);
+            mMediaPlayer.start();
+            mState.set(State.STARTED);
+        }
+        if (SHOW_LOGS) Logger.v(TAG, "<< start");
+    }
+
+    /**
      * @see MediaPlayer#setDataSource(Context, Uri)
      */
     public void setDataSource(String filePath) throws IOException {
@@ -127,6 +137,20 @@ public abstract class MediaPlayerWrapper
 
             //setOnBufferingUpdateListener only be called in internet streams
             mMediaPlayer.setDataSource(mContext, Uri.parse(filePath));
+            mState.set(State.INITIALIZED);
+        }
+    }
+
+    /**
+     * @see MediaPlayer#setDataSource(Context, Uri)
+     */
+    public void setDataSource(Uri filePath) throws IOException {
+        synchronized (mState) {
+            if (SHOW_LOGS)
+                Logger.v(TAG, "setDataSource, filePath " + filePath + ", mState " + mState);
+
+            //setOnBufferingUpdateListener only be called in internet streams
+            mMediaPlayer.setDataSource(mContext, filePath);
             mState.set(State.INITIALIZED);
         }
     }
@@ -155,6 +179,10 @@ public abstract class MediaPlayerWrapper
         }
     }
 
+    private boolean inUiThread() {
+        return Thread.currentThread().getId() == 1;
+    }
+
     @Override
     public void onCompletion(MediaPlayer mp) {
         if (SHOW_LOGS) Logger.v(TAG, "onVideoCompletion, mState " + mState);
@@ -177,7 +205,7 @@ public abstract class MediaPlayerWrapper
         }
 
         //weird error code what = -38 ? What the hell?
-        if(what == MediaPlayer.MEDIA_ERROR_UNKNOWN || what == MediaPlayer.MEDIA_ERROR_SERVER_DIED) {
+        if (what == MediaPlayer.MEDIA_ERROR_UNKNOWN || what == MediaPlayer.MEDIA_ERROR_SERVER_DIED) {
             if (mListener != null) {
                 mListener.onErrorMainThread(what, extra);
             }
@@ -249,23 +277,6 @@ public abstract class MediaPlayerWrapper
     }
 
     /**
-     * Play or resume video. Video will be played as soon as view is available and media player is
-     * prepared.
-     * <p/>
-     * If video is stopped or ended and play() method was called, video will start over.
-     */
-    public void start() {
-        if (SHOW_LOGS) Logger.v(TAG, ">> start");
-
-        synchronized (mState) {
-            if (SHOW_LOGS) Logger.v(TAG, "start, mState " + mState);
-            mMediaPlayer.start();
-            mState.set(State.STARTED);
-        }
-        if (SHOW_LOGS) Logger.v(TAG, "<< start");
-    }
-
-    /**
      * Pause video. If video is already paused, stopped or ended nothing will happen.
      */
     public void pause() {
@@ -279,15 +290,6 @@ public abstract class MediaPlayerWrapper
         }
         if (SHOW_LOGS) Logger.v(TAG, "<< pause");
     }
-
-    private final Runnable mOnVideoStopMessage = new Runnable() {
-        @Override
-        public void run() {
-            if (SHOW_LOGS) Logger.v(TAG, ">> run, onVideoStoppedMainThread");
-            mListener.onVideoStoppedMainThread();
-            if (SHOW_LOGS) Logger.v(TAG, "<< run, onVideoStoppedMainThread");
-        }
-    };
 
     public void stop() {
         if (SHOW_LOGS) Logger.v(TAG, ">> stop");
@@ -439,14 +441,22 @@ public abstract class MediaPlayerWrapper
         }
     }
 
-    public static int positionToPercent(int progressMillis, int durationMillis) {
-        float percentPrecise = (float) progressMillis / (float) durationMillis * 100f;
-        return Math.round(percentPrecise);
-    }
-
     @Override
     public String toString() {
         return getClass().getSimpleName() + "@" + hashCode();
+    }
+
+    public enum State {
+        IDLE,
+        INITIALIZED,
+        PREPARING,
+        PREPARED,
+        STARTED,
+        PAUSED,
+        STOPPED,
+        PLAYBACK_COMPLETED,
+        END,
+        ERROR
     }
 
     public interface MainThreadMediaPlayerListener {
@@ -463,9 +473,5 @@ public abstract class MediaPlayerWrapper
         void onVideoStoppedMainThread();
 
         void onInfoMainThread(int what);
-    }
-
-    private boolean inUiThread() {
-        return Thread.currentThread().getId() == 1;
     }
 }

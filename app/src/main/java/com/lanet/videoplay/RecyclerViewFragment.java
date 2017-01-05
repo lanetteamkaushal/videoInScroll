@@ -1,10 +1,10 @@
 package com.lanet.videoplay;
 
-import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.media.MediaPlayer;
-import android.os.Build;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.Nullable;
@@ -31,6 +31,9 @@ import com.volokh.danylo.video_player_manager.meta.MetaData;
 import com.volokh.danylo.video_player_manager.ui.MediaPlayerWrapper;
 import com.volokh.danylo.video_player_manager.ui.VideoPlayerView;
 import com.volokh.danylo.video_player_manager.utils.Utils;
+
+import java.io.File;
+import java.io.FilenameFilter;
 
 /**
  * Created by Bruce Too On 10/20/16. At 23:33
@@ -73,6 +76,8 @@ public class RecyclerViewFragment extends Fragment implements View.OnClickListen
 
     private float mMoveDeltaY;
     private VideoControllerView.MediaPlayerControlListener mPlayerControlListener = new VideoControllerView.MediaPlayerControlListener() {
+        boolean isFullScreen = false;
+
         @Override
         public void start() {
             if (checkMediaPlayerInvalid())
@@ -127,36 +132,66 @@ public class RecyclerViewFragment extends Fragment implements View.OnClickListen
 
         @Override
         public boolean isFullScreen() {
-            return getActivity().getRequestedOrientation() == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                    || getActivity().getRequestedOrientation() == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+//            return getActivity().getRequestedOrientation() == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+//                    || getActivity().getRequestedOrientation() == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
+            return isFullScreen;
         }
 
         @Override
         public void toggleFullScreen() {
             if (isFullScreen()) {
                 try {
+                    //kfix mute video
                     mVideoPlayerView.muteVideo();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                isFullScreen = false;
+//                getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             } else {
                 try {
+                    //kfix unmute video
                     mVideoPlayerView.unMuteVideo();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                getActivity().setRequestedOrientation(Build.VERSION.SDK_INT < 9 ?
-                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE :
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                isFullScreen = true;
+//                getActivity().setRequestedOrientation(Build.VERSION.SDK_INT < 9 ?
+//                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE :
+//                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             }
+            setLayoutParamsForVideoView();
+        }
+
+        private void setLayoutParamsForVideoView() {
+            ViewGroup.LayoutParams layoutParams = mVideoFloatContainer.getLayoutParams();
+            mCurrentVideoControllerView.hide();
+            //kfix Main Logic for zoom
+            if (!isFullScreen()) {
+                //200 indicate the height of video play area
+                layoutParams.height = (int) getResources().getDimension(R.dimen.video_item_portrait_height);
+                layoutParams.width = Utils.getDeviceWidth(getActivity());
+                ViewAnimator.putOn(mVideoFloatContainer).translationY(mOriginalHeight);
+                // Show status bar
+                getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                mRecyclerView.setEnableScroll(true);
+            } else {
+                layoutParams.height = Utils.getDeviceHeight(getActivity());
+                layoutParams.width = Utils.getDeviceWidth(getActivity());
+                Log.e(TAG, "onConfigurationChanged translationY:" + mVideoFloatContainer.getTranslationY());
+                ViewAnimator.putOn(mVideoFloatContainer).translationY(0);
+                // Hide status
+                getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                mRecyclerView.setEnableScroll(false);
+            }
+            mVideoFloatContainer.setLayoutParams(layoutParams);
         }
 
         @Override
         public void exit() {
             //TODO to handle exit status
             if (isFullScreen()) {
-                getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+//                getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             }
         }
     };
@@ -229,6 +264,7 @@ public class RecyclerViewFragment extends Fragment implements View.OnClickListen
             }
         }
     };
+    private RecyclerAdapter adapter;
 
     @Nullable
     @Override
@@ -251,7 +287,7 @@ public class RecyclerViewFragment extends Fragment implements View.OnClickListen
         mLayoutManager = new LinearLayoutManager(getContext());
         mRecyclerView.setLayoutManager(mLayoutManager);
         mRecyclerView.addOnScrollListener(mOnScrollListener);
-        mRecyclerView.setAdapter(new RecyclerAdapter(this));
+        mRecyclerView.setAdapter(adapter = new RecyclerAdapter(this));
 
         mVideoPlayerView.addMediaPlayerListener(new MediaPlayerWrapper.MainThreadMediaPlayerListener() {
             @Override
@@ -281,8 +317,8 @@ public class RecyclerViewFragment extends Fragment implements View.OnClickListen
 
                 mVideoFloatContainer.setVisibility(View.INVISIBLE);
                 mCurrentPlayArea.setVisibility(View.VISIBLE);
-                getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-
+//                getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                mRecyclerView.setEnableScroll(true);
                 ViewAnimator.putOn(mVideoFloatContainer).translationY(0);
 
                 //stop update progress
@@ -500,6 +536,51 @@ public class RecyclerViewFragment extends Fragment implements View.OnClickListen
 
         Log.i(TAG, "startMoveFloatContainer < after getTranslationY:" + mVideoFloatContainer.getTranslationY());
     }
+
+    public void readWhatsapp() {
+        File file = Environment.getExternalStorageDirectory();
+        File[] wDir = file.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                if (name.contains("WhatsApp"))
+                    return true;
+                return false;
+            }
+        });
+        if (wDir != null && wDir.length > 0) {
+            File wd = wDir[0];
+            Log.d(TAG, "readWhatsapp: We are looking into:" + wd.getAbsolutePath());
+            File wdm = new File(wd, "Media");
+            File wdmv = new File(wdm, "WhatsApp Video");
+            if (wdmv.exists()) {
+                Log.d(TAG, "readWhatsapp: We reached destination");
+                File[] fileNames = wdmv.listFiles(new FilenameFilter() {
+                    @Override
+                    public boolean accept(File dir, String name) {
+                        if (name.endsWith(".mp4"))
+                            return true;
+                        return false;
+                    }
+                });
+                makeList(fileNames);
+            } else {
+                Log.e(TAG, "readWhatsapp: File not exits @" + wdmv.getAbsolutePath());
+            }
+        }
+    }
+
+    private void makeList(File[] fileNames) {
+        if (fileNames != null) {
+            ListDataGenerater.datas.clear();
+            for (int i = 0; i < fileNames.length; i++) {
+                ListDataGenerater.datas.add(new VideoModel
+                        ("http://android-imgs.25pp.com/fs08/2016/10/19/9/a1ac5b3170f5222c76bd0b85272058b8.jpg"
+                                , Uri.parse(fileNames[i].getAbsolutePath())));
+            }
+            adapter.notifyDataSetChanged();
+        }
+    }
+
 
     private class RecyclerAdapter extends RecyclerView.Adapter<RecyclerAdapter.ItemViewHolder> {
 

@@ -1,6 +1,7 @@
 package com.volokh.danylo.video_player_manager.manager;
 
 import android.content.res.AssetFileDescriptor;
+import android.net.Uri;
 
 import com.volokh.danylo.video_player_manager.meta.MetaData;
 import com.volokh.danylo.video_player_manager.ui.VideoPlayerView;
@@ -24,6 +25,15 @@ public interface VideoPlayerManager<T extends MetaData> {
      * @param videoUrl - the link to the video source
      */
     void playNewVideo(T metaData, VideoPlayerView videoPlayerView, String videoUrl);
+
+    /**
+     * Call it if you have direct url or path to video source
+     *
+     * @param metaData        - optional Meta Data
+     * @param videoPlayerView - the actual video player
+     * @param videoUrl        - the link to the video source
+     */
+    void playNewVideo(T metaData, VideoPlayerView videoPlayerView, Uri videoUrl);
 
     /**
      * Call it if you have video source in assets directory

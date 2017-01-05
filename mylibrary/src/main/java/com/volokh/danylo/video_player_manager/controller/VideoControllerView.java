@@ -836,6 +836,7 @@ public class VideoControllerView extends FrameLayout implements VideoGestureList
 
         public Builder withVideoView(@Nullable View videoView) {
             this.videoView = videoView;
+            //kfix default mute video
             if (videoView instanceof VideoPlayerView) {
                 ((VideoPlayerView) this.videoView).muteVideo();
             }
